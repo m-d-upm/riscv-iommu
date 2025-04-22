@@ -743,7 +743,9 @@ module riscv_iommu #(
           `endif
             .NoMstPorts     ( 3             ),  // MRIF supports adds ignoring mechanism
             .AxiLookBits    ( ID_WIDTH      ),  // Assuming same value as AXI ID width
+          `ifdef USE_LOCAL_VENDOR_PKGS
             .FallThrough    ( 1'b0          ),
+          `endif
             .SpillAw        ( 1'b0          ),
             .SpillW         ( 1'b0          ),
             .SpillB         ( 1'b0          ),
@@ -789,7 +791,9 @@ module riscv_iommu #(
           `endif
             .NoMstPorts     ( 2             ),  // MRIF supports adds ignoring mechanism
             .AxiLookBits    ( ID_WIDTH      ),  // Assuming same value as AXI ID width
+          `ifdef USE_LOCAL_VENDOR_PKGS
             .FallThrough    ( 1'b0          ),
+          `endif
             .SpillAw        ( 1'b0          ),
             .SpillW         ( 1'b0          ),
             .SpillB         ( 1'b0          ),
