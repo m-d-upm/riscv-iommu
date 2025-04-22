@@ -17,13 +17,23 @@
 #
 # Description:  Makefile to perform lint checks in the RISC-V IOMMU IP using verilator
 
+VERILATOR = verilator
+
 WARN_FLAGS :=
 WARN_FLAGS += -Wno-LATCH
 
-COMP_FLAGS :=
-# COMP_FLAGS += --cc
-COMP_FLAGS += --lint-only
-# COMP_FLAGS += --report-unoptflat
+COMP_FLAGS := --cc \
+	      --Wall \
+	      --Wno-fatal \
+	      +1800-2017ext+ \
+	      --assert \
+	      --error-limit 1000 \
+	      --hierarchical \
+	      --no-skip-identical
+# COMP_FLAGS +=
+
+LINT_FLAGS := --lint-only
+# LINT_FLAGS += --report-unoptflat
 
 INC += -I./packages/dependencies
 INC += -I./packages/rv_iommu
@@ -42,7 +52,13 @@ INC += -I./rtl/ext_interfaces
 all: lint
 
 lint:
-	verilator-5.022 ${COMP_FLAGS} lint_checks.sv ${INC} ${WARN_FLAGS}
+	$(VERILATOR) ${LINT_FLAGS} lint_checks.sv ${INC} ${WARN_FLAGS}
 
 lint2log:
-	verilator-5.022 ${COMP_FLAGS} lint_checks.sv ${INC} ${WARN_FLAGS} 2> verilator.log
+	$(VERILATOR) ${LINT_FLAGS} lint_checks.sv ${INC} ${WARN_FLAGS} 2> verilator.log
+
+build:
+	$(VERILATOR) ${COMP_FLAGS} lint_checks.sv ${INC} ${WARN_FLAGS}
+
+build2log:
+	$(VERILATOR) ${COMP_FLAGS} lint_checks.sv ${INC} ${WARN_FLAGS} 2> verilator.log
