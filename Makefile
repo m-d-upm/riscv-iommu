@@ -29,10 +29,12 @@ COMP_FLAGS := --cc \
 	      --assert \
 	      --error-limit 1000 \
 	      --hierarchical \
-	      --no-skip-identical
+	      --no-skip-identical \
+	      #-DUSE_LOCAL_VENDOR_PKGS
 # COMP_FLAGS +=
 
-LINT_FLAGS := --lint-only
+LINT_FLAGS := --lint-only \
+	      -DUSE_LOCAL_VENDOR_PKGS
 # LINT_FLAGS += --report-unoptflat
 
 INC += -I./packages/dependencies
