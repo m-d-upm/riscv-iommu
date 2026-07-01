@@ -31,10 +31,6 @@ module rv_iommu_prog_if #(
     /// AXI user width
     parameter int               USER_WIDTH  = 1,
     
-    /// AXI Full request struct type
-    parameter type  axi_req_t = logic,
-    /// AXI Full response struct type
-    parameter type  axi_rsp_t = logic,
     /// Regbus request struct type.
     parameter type  reg_req_t = logic,
     /// Regbus response struct type.
@@ -46,8 +42,14 @@ module rv_iommu_prog_if #(
     input  logic     rst_ni,
 
     // From IOMMU programing interface
-    input  axi_req_t prog_req_i,
-    output axi_rsp_t prog_resp_o,
+    input logic apb_reg_bus_penable,
+    input logic apb_reg_bus_pwrite,
+    input logic [31:0] apb_reg_bus_paddr,
+    input logic apb_reg_bus_psel,
+    input logic [31:0] apb_reg_bus_pwdata,
+    output logic [31:0] apb_reg_bus_prdata,
+    output logic apb_reg_bus_pready,
+    output logic apb_reg_bus_pslverr,
 
     // To register map
     output reg_req_t regmap_req_o,
@@ -68,78 +70,15 @@ module rv_iommu_prog_if #(
     logic                       pready;
     logic                       pslverr;
 
-    // AXI4 to APB IF
-    axi2apb_64_32 #(
-        .AXI4_ADDRESS_WIDTH ( ADDR_WIDTH  ),
-        .AXI4_RDATA_WIDTH   ( DATA_WIDTH  ),
-        .AXI4_WDATA_WIDTH   ( DATA_WIDTH  ),
-        .AXI4_ID_WIDTH      ( ID_WIDTH    ),
-        .AXI4_USER_WIDTH    ( USER_WIDTH  ),
-        .BUFF_DEPTH_SLAVE   ( 2           ),
-        .APB_ADDR_WIDTH     ( ADDR_WIDTH  )
-    ) i_axi2apb_64_32_iommu (
-        .ACLK      ( clk_i          ),
-        .ARESETn   ( rst_ni         ),
-        .test_en_i ( 1'b0           ),
-        // AW
-        .AWID_i    ( prog_req_i.aw.id     ),
-        .AWADDR_i  ( prog_req_i.aw.addr   ),
-        .AWLEN_i   ( prog_req_i.aw.len    ),
-        .AWSIZE_i  ( prog_req_i.aw.size   ),
-        .AWBURST_i ( prog_req_i.aw.burst  ),
-        .AWLOCK_i  ( prog_req_i.aw.lock   ),
-        .AWCACHE_i ( prog_req_i.aw.cache  ),
-        .AWPROT_i  ( prog_req_i.aw.prot   ),
-        .AWREGION_i( prog_req_i.aw.region ),
-        .AWUSER_i  ( prog_req_i.aw.user   ),
-        .AWQOS_i   ( prog_req_i.aw.qos    ),
-        .AWVALID_i ( prog_req_i.aw_valid  ),
-        .AWREADY_o ( prog_resp_o.aw_ready ),
-        // W
-        .WDATA_i   ( prog_req_i.w.data    ),
-        .WSTRB_i   ( prog_req_i.w.strb    ),
-        .WLAST_i   ( prog_req_i.w.last    ),
-        .WUSER_i   ( prog_req_i.w.user    ),
-        .WVALID_i  ( prog_req_i.w_valid   ),
-        .WREADY_o  ( prog_resp_o.w_ready  ),
-        // B
-        .BID_o     ( prog_resp_o.b.id     ),
-        .BRESP_o   ( prog_resp_o.b.resp   ),
-        .BUSER_o   ( prog_resp_o.b.user   ),
-        .BVALID_o  ( prog_resp_o.b_valid  ),
-        .BREADY_i  ( prog_req_i.b_ready   ),
-        // AR
-        .ARID_i    ( prog_req_i.ar.id     ),
-        .ARADDR_i  ( prog_req_i.ar.addr   ),
-        .ARLEN_i   ( prog_req_i.ar.len    ),
-        .ARSIZE_i  ( prog_req_i.ar.size   ),
-        .ARBURST_i ( prog_req_i.ar.burst  ),
-        .ARLOCK_i  ( prog_req_i.ar.lock   ),
-        .ARCACHE_i ( prog_req_i.ar.cache  ),
-        .ARPROT_i  ( prog_req_i.ar.prot   ),
-        .ARREGION_i( prog_req_i.ar.region ),
-        .ARUSER_i  ( prog_req_i.ar.user   ),
-        .ARQOS_i   ( prog_req_i.ar.qos    ),
-        .ARVALID_i ( prog_req_i.ar_valid  ),
-        .ARREADY_o ( prog_resp_o.ar_ready ),
-        // R
-        .RID_o     ( prog_resp_o.r.id     ),
-        .RDATA_o   ( prog_resp_o.r.data   ),
-        .RRESP_o   ( prog_resp_o.r.resp   ),
-        .RLAST_o   ( prog_resp_o.r.last   ),
-        .RUSER_o   ( prog_resp_o.r.user   ),
-        .RVALID_o  ( prog_resp_o.r_valid  ),
-        .RREADY_i  ( prog_req_i.r_ready   ),
-        // APB IF
-        .PENABLE   ( penable              ),
-        .PWRITE    ( pwrite               ),
-        .PADDR     ( paddr                ),
-        .PSEL      ( psel                 ),
-        .PWDATA    ( pwdata               ),
-        .PRDATA    ( prdata               ),
-        .PREADY    ( pready               ),
-        .PSLVERR   ( pslverr              )
-    );
+    assign penable = apb_reg_bus_penable;
+    assign pwrite = apb_reg_bus_pwrite;
+    assign paddr = [31:0] apb_reg_bus_paddr;
+    assign psel = apb_reg_bus_psel;
+    assign pwdata = [31:0] apb_reg_bus_pwdata;
+
+    assign apb_reg_bus_prdata = prdata;
+    assign apb_reg_bus_pready = pready;
+    assign apb_reg_bus_pslverr = pslverr;
 
     // APB to REG IF
     apb_to_reg i_apb_to_reg (

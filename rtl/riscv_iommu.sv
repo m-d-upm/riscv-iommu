@@ -48,8 +48,6 @@ module riscv_iommu #(
     parameter int   DATA_WIDTH      = -1,
     /// AXI ID width
     parameter int   ID_WIDTH        = -1,
-    /// AXI ID width
-    parameter int   ID_SLV_WIDTH    = -1,
     /// AXI user width
     parameter int   USER_WIDTH      = 1,
     /// AXI AW Channel struct type
@@ -66,10 +64,6 @@ module riscv_iommu #(
     parameter type  axi_req_t       = logic,
     /// AXI Full response struct type
     parameter type  axi_rsp_t       = logic,
-    /// AXI Full Slave request struct type
-    parameter type  axi_req_slv_t   = logic,
-    /// AXI Full Slave response struct type
-    parameter type  axi_rsp_slv_t   = logic,
     /// AXI Full request struct type w/ DVM extension for SMMU
     parameter type  axi_req_iommu_t = logic,
     /// Regbus request struct type.
@@ -93,8 +87,14 @@ module riscv_iommu #(
     output axi_req_t        ds_req_o,
 
     // Programming Interface (Slave)
-    input  axi_req_slv_t    prog_req_i,
-    output axi_rsp_slv_t    prog_resp_o,
+    input logic apb_reg_bus_penable,
+    input logic apb_reg_bus_pwrite,
+    input logic [31:0] apb_reg_bus_paddr,
+    input logic apb_reg_bus_psel,
+    input logic [31:0] apb_reg_bus_pwdata,
+    output logic [31:0] apb_reg_bus_prdata,
+    output logic apb_reg_bus_pready,
+    output logic apb_reg_bus_pslverr,
 
     output logic [(N_INT_VEC-1):0] wsi_wires_o
 );
@@ -409,8 +409,6 @@ module riscv_iommu #(
         .DATA_WIDTH     (DATA_WIDTH     ),
         .ID_WIDTH       (ID_SLV_WIDTH   ),
         .USER_WIDTH     (USER_WIDTH     ),
-        .axi_req_t      (axi_req_slv_t  ),
-        .axi_rsp_t      (axi_rsp_slv_t  ),
         .reg_req_t      (reg_req_t      ),
         .reg_rsp_t      (reg_rsp_t      )
     ) i_rv_iommu_prog_if (
@@ -418,9 +416,14 @@ module riscv_iommu #(
         .rst_ni         (rst_ni         ),
 
         // From IOMMU ext port
-        .prog_req_i     (prog_req_i     ),
-        .prog_resp_o    (prog_resp_o    ),
-
+        .apb_reg_bus_penable(apb_reg_bus_penable),
+        .apb_reg_bus_pwrite(apb_reg_bus_pwrite),
+        .apb_reg_bus_paddr(apb_reg_bus_paddr),
+        .apb_reg_bus_psel(apb_reg_bus_psel),
+        .apb_reg_bus_pwdata(apb_reg_bus_pwdata),
+        .apb_reg_bus_prdata(apb_reg_bus_prdata),
+        .apb_reg_bus_pready(apb_reg_bus_pready),
+        .apb_reg_bus_pslverr(apb_reg_bus_pslverr),
         // To SW interface wrapper
         .regmap_req_o   (regmap_req     ),
         .regmap_resp_i  (regmap_resp    )
