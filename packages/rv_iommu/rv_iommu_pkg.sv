@@ -20,6 +20,71 @@
 `define RV_IOMMU_PKG
 
 package rv_iommu;
+    localparam XLEN = 64;
+
+    // ----------------------
+    // Data and Address length
+    // ----------------------
+    typedef enum logic [3:0] {
+       ModeOff  = 0,
+       ModeSv32 = 1,
+       ModeSv39 = 8,
+       ModeSv48 = 9,
+       ModeSv57 = 10,
+       ModeSv64 = 11
+    } vm_mode_t;
+
+    // ----------------------
+    // Virtual Memory
+    // ----------------------
+    // memory management, pte for sv39
+    typedef struct packed {
+        logic [9:0]  reserved;
+        logic [44-1:0] ppn; // PPN length for
+        logic [1:0]  rsw;
+        logic d;
+        logic a;
+        logic g;
+        logic u;
+        logic x;
+        logic w;
+        logic r;
+        logic v;
+    } pte_t;
+
+    // memory management, pte for sv32
+    typedef struct packed {
+        logic [22-1:0] ppn; // PPN length for
+        logic [1:0]  rsw;
+        logic d;
+        logic a;
+        logic g;
+        logic u;
+        logic x;
+        logic w;
+        logic r;
+        logic v;
+    } pte_sv32_t;
+
+    // Warning: When using STD_CACHE, configuration must be PLEN=56 and VLEN=64
+    // Warning: VLEN must be superior or equal to PLEN
+    localparam VLEN             = (XLEN == 32) ? 32 : 64;    // virtual address length
+    localparam PLEN             = (XLEN == 32) ? 34 : 56;    // physical address length
+    localparam GPLEN            = (XLEN == 32) ? 34 : 41;    // guest physical address length
+
+    localparam IS_XLEN32        = (XLEN == 32) ? 1'b1 : 1'b0;
+    localparam IS_XLEN64        = (XLEN == 32) ? 1'b0 : 1'b1;
+    localparam ModeW            = (XLEN == 32) ? 1 : 4;
+    localparam ASIDW            = (XLEN == 32) ? 9 : 16;
+    localparam VMIDW            = (XLEN == 32) ? 7 : 14;
+    localparam PPNW             = (XLEN == 32) ? 22 : 44;
+    localparam GPPNW            = (XLEN == 32) ? 22 : 29;
+    localparam vm_mode_t        MODE_SV = (XLEN == 32) ? ModeSv32 : ModeSv39;
+    localparam SV               = (MODE_SV == ModeSv32) ? 32 : 39;
+    localparam SVX              = (MODE_SV == ModeSv32) ? 34 : 41;
+    localparam VPN2             = (VLEN-31 < 8) ? VLEN-31 : 8;
+    localparam GPPN2            = (XLEN == 32) ? VLEN-33 : 10;
+    localparam XLEN_ALIGN_BYTES = $clog2(XLEN/8);
 
     // Device Context max length
     localparam DEV_ID_MAX_LEN   = 24;
@@ -410,7 +475,7 @@ package rv_iommu;
     // Device Directory Table Pointer (ddtp)
     typedef struct packed {
         logic [9:0]             reserved_2;
-        logic [riscv::PPNW-1:0] ppn;
+        logic [PPNW-1:0] ppn;
         logic [4:0]             reserved_1;
         logic                   busy;
         logic [3:0]             iommu_mode;
@@ -465,30 +530,30 @@ package rv_iommu;
 
     // Computes the paddr based on the page size, ppn and offset
     // Adapted from MMU function in ariane_pkg
-    function automatic logic [(riscv::GPLEN-1):0] make_gpaddr(
+    function automatic logic [(GPLEN-1):0] make_gpaddr(
         input logic S1_en, input logic is_1G, input logic is_2M,
-        input logic [(riscv::VLEN-1):0] vaddr, input riscv::pte_t pte);
-        logic [(riscv::GPLEN-1):0] gpaddr;
+        input logic [(VLEN-1):0] vaddr, input pte_t pte);
+        logic [(GPLEN-1):0] gpaddr;
         if (S1_en) begin
-        gpaddr = {pte.ppn[(riscv::GPPNW-1):0], vaddr[11:0]};
+        gpaddr = {pte.ppn[(GPPNW-1):0], vaddr[11:0]};
         // Giga page
         if (is_1G) gpaddr[29:12] = vaddr[29:12];
         // Mega page
         if (is_2M) gpaddr[20:12] = vaddr[20:12];
         end else begin
-        gpaddr = vaddr[(riscv::GPLEN-1):0];
+        gpaddr = vaddr[(GPLEN-1):0];
         end
         return gpaddr;
     endfunction : make_gpaddr
 
     // Computes the final gppn based on the guest physical address
     // Adapted from MMU function in ariane_pkg
-    function automatic logic [(riscv::GPPNW-1):0] make_gppn(input logic S1_en, input logic is_1G,
+    function automatic logic [(GPPNW-1):0] make_gppn(input logic S1_en, input logic is_1G,
                                                             input logic is_2M, input logic [28:0] vpn,
-                                                            input riscv::pte_t pte);
-        logic [(riscv::GPPNW-1):0] gppn;
+                                                            input pte_t pte);
+        logic [(GPPNW-1):0] gppn;
         if (S1_en) begin
-        gppn = pte.ppn[(riscv::GPPNW-1):0];
+        gppn = pte.ppn[(GPPNW-1):0];
         if (is_2M) gppn[8:0] = vpn[8:0];
         if (is_1G) gppn[17:0] = vpn[17:0];
         end else begin
@@ -499,14 +564,14 @@ package rv_iommu;
 
     // Extract Interrupt File number from GPA
     // The resulting IF number is used to index the corresponding MSI PTE in memory.
-    function automatic logic [(riscv::GPPNW-1):0] extract_imsic_num(input logic [(riscv::GPPNW-1):0] gpaddr, input logic [riscv::GPPNW-1:0] mask);
-        logic [(riscv::GPPNW-1):0] masked_gpaddr, imsic_num;
+    function automatic logic [(GPPNW-1):0] extract_imsic_num(input logic [(GPPNW-1):0] gpaddr, input logic [GPPNW-1:0] mask);
+        logic [(GPPNW-1):0] masked_gpaddr, imsic_num;
         int unsigned i;
 
         masked_gpaddr = gpaddr & mask;
         imsic_num = '0;
         i = 0;
-        for (int unsigned k = 0 ; k < riscv::GPPNW; k++) begin
+        for (int unsigned k = 0 ; k < GPPNW; k++) begin
             if (mask[k]) begin
                 imsic_num[i] = masked_gpaddr[k];
                 i++;
